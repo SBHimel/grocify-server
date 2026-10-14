@@ -1,0 +1,21 @@
+# Server .gitignore
+
+# Dependencies
+node_modules/
+
+# Environment variables & secrets (NEVER COMMIT)
+.env
+.env*
+!.env.example
+
+# Build outputs
+dist/
+.vercel/
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Logs & temp
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
