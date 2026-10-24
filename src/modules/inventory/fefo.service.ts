@@ -3,7 +3,8 @@ import { AppError } from "../../middlewares/error.js";
 import { UnitOfMeasure } from "../../types/index.js";
 import { ProductDocument } from "../products/products.model.js";
 import { InventoryBatchDocument, StockMovementDocument, MovementType } from "./inventory.model.js";
-import { convertQuantity } from "./unit-conversion.js";
+import { convertQuantity, canConvert } from "./unit-conversion.js";
+import { logger } from "../../utils/logger.js";
 
 export interface FEFOAllocationItem {
   batchId: ObjectId;
@@ -50,6 +51,15 @@ export const allocateStockFEFO = async (
   const product = await productsCollection.findOne({ _id: productId });
   if (!product) {
     throw new AppError("Product not found for stock allocation.", 404, "PRODUCT_NOT_FOUND");
+  }
+
+  // Validate requestUnit can convert to product's baseUnit
+  if (!canConvert(requestUnit, product.unit.baseUnit, product.unit)) {
+    throw new AppError(
+      `Cannot convert requested order unit '${requestUnit}' to product stock unit '${product.unit.baseUnit}' for '${product.name}'. No valid product conversion configured.`,
+      400,
+      "INVALID_UNIT_CONVERSION"
+    );
   }
 
   // Convert requested quantity into the product's base unit
@@ -106,6 +116,14 @@ export const allocateStockFEFO = async (
 
   for (const batch of candidateBatches) {
     if (remainingToAllocate <= 0) break;
+
+    // Check if batch unit can convert to product baseUnit without error
+    if (!canConvert(batch.unit, product.unit.baseUnit, product.unit)) {
+      logger.warn(
+        `[FEFO] Skipping batch ${batch.batchNumber} (_id: ${batch._id}) for '${product.name}': batch unit '${batch.unit}' is incompatible with stock unit '${product.unit.baseUnit}'.`
+      );
+      continue;
+    }
 
     // Convert batch quantity into product baseUnit
     const batchQtyInBaseUnit = convertQuantity(
@@ -225,12 +243,14 @@ export const executeStockAllocation = async (
 
   let totalAvailableStockInBaseUnit = 0;
   for (const b of remainingBatches) {
-    totalAvailableStockInBaseUnit += convertQuantity(
-      b.quantity,
-      b.unit,
-      product.unit.baseUnit,
-      product.unit
-    );
+    if (canConvert(b.unit, product.unit.baseUnit, product.unit)) {
+      totalAvailableStockInBaseUnit += convertQuantity(
+        b.quantity,
+        b.unit,
+        product.unit.baseUnit,
+        product.unit
+      );
+    }
   }
 
   await productsCollection.updateOne(

@@ -145,27 +145,38 @@ export const createReview = async (
 
 /**
  * DELETE /api/v1/products/:productId/reviews/:reviewId
- * Owner/Manager only — moderation: remove any review.
+ * Review Author or Owner/Manager (moderation): remove review and sync product rating.
  */
 export const deleteReview = async (
   req: AuthenticatedRequest,
   res: Response
 ): Promise<Response> => {
+  const currentUser = req.user;
+  if (!currentUser) {
+    throw new AppError("Authentication required.", 401, "UNAUTHORIZED");
+  }
+
   const rawProductId = Array.isArray(req.params.productId) ? req.params.productId[0] : req.params.productId;
   const rawReviewId = Array.isArray(req.params.reviewId) ? req.params.reviewId[0] : req.params.reviewId;
   const productId = parseObjectId(rawProductId, "productId");
   const reviewId = parseObjectId(rawReviewId, "reviewId");
 
   const db = getDb();
-  const result = await db.collection<ReviewDocument>("reviews").deleteOne({
-    _id: reviewId,
-    productId,
-  });
+  const reviewsCol = db.collection<ReviewDocument>("reviews");
 
-  if (result.deletedCount === 0) {
+  const existingReview = await reviewsCol.findOne({ _id: reviewId, productId });
+  if (!existingReview) {
     throw new AppError("Review not found.", 404, "REVIEW_NOT_FOUND");
   }
 
+  const isModerator = currentUser.role === "owner" || currentUser.role === "manager";
+  const isAuthor = existingReview.userId === currentUser.id;
+
+  if (!isModerator && !isAuthor) {
+    throw new AppError("You do not have permission to delete this review.", 403, "FORBIDDEN");
+  }
+
+  await reviewsCol.deleteOne({ _id: reviewId, productId });
   await syncProductRating(productId);
 
   return sendSuccess(res, { id: reviewId.toString() }, "Review deleted successfully.");

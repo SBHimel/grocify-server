@@ -23,10 +23,19 @@ export interface ProductUnitConversion {
   multiplier: number;
 }
 
+export interface PaginationMeta {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 export interface ApiResponse<T = unknown> {
   success: boolean;
   message?: string;
   data?: T;
+  meta?: PaginationMeta | Record<string, unknown>;
+  pagination?: PaginationMeta;
   error?: {
     code?: string;
     details?: unknown;

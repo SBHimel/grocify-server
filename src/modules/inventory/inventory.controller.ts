@@ -13,7 +13,7 @@ import {
   StockMovementResponse,
   MovementType,
 } from "./inventory.model.js";
-import { convertQuantity } from "./unit-conversion.js";
+import { convertQuantity, canConvert } from "./unit-conversion.js";
 import { allocateStockFEFO, executeStockAllocation } from "./fefo.service.js";
 import { runExpiryInspection } from "./expiry.service.js";
 
@@ -125,6 +125,17 @@ export const createBatch = async (
     throw new AppError(`Invalid unit: '${unit}'. Supported units: ${validUnits.join(", ")}`, 400);
   }
 
+  if (!canConvert(unit, product.unit.baseUnit, product.unit)) {
+    throw new AppError(
+      `Batch unit '${unit}' is incompatible with product stock unit '${product.unit.baseUnit}' for '${product.name}'. No valid conversion configured.`,
+      400,
+      "INVALID_UNIT_CONVERSION"
+    );
+  }
+
+  // Calculate base quantity before creating batch document
+  const qtyInBaseUnit = convertQuantity(numQuantity, unit, product.unit.baseUnit, product.unit);
+
   const now = new Date();
   const parsedReceivedDate = receivedDate ? new Date(receivedDate) : now;
   const parsedExpiryDate = expiryDate ? new Date(expiryDate) : undefined;
@@ -180,7 +191,6 @@ export const createBatch = async (
   await movementsCollection.insertOne(movementDoc);
 
   // Update total currentStock on product
-  const qtyInBaseUnit = convertQuantity(numQuantity, unit, product.unit.baseUnit, product.unit);
   const newProductStock = Math.round((product.currentStock + qtyInBaseUnit) * 10000) / 10000;
 
   await productsCollection.updateOne(

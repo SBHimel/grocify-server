@@ -21,11 +21,10 @@ router.post(
   createReview
 );
 
-// Owner/Manager only: delete a review (moderation)
+// Authenticated: delete a review (author or owner/manager moderation)
 router.delete(
   "/products/:productId/reviews/:reviewId",
   verifyAuthToken,
-  requireRole(["owner", "manager"]),
   validateObjectIdParam("productId"),
   validateObjectIdParam("reviewId"),
   deleteReview

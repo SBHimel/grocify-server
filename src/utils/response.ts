@@ -5,12 +5,14 @@ export const sendSuccess = <T>(
   res: Response,
   data?: T,
   message?: string,
-  statusCode = 200
+  statusCode = 200,
+  meta?: Record<string, unknown>
 ): Response => {
   const payload: ApiResponse<T> = {
     success: true,
     ...(message ? { message } : {}),
     ...(data !== undefined ? { data } : {}),
+    ...(meta ? { meta, pagination: meta as any } : {}),
   };
   return res.status(statusCode).json(payload);
 };

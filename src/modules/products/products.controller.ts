@@ -7,6 +7,7 @@ import { parseObjectId, escapeRegex } from "../../middlewares/validate.js";
 import { sendSuccess } from "../../utils/response.js";
 import { ProductDocument, ProductResponse } from "./products.model.js";
 import { CategoryDocument } from "../categories/categories.model.js";
+import { canConvert, convertQuantity } from "../inventory/unit-conversion.js";
 
 const slugify = (text: string): string => {
   return text
@@ -16,6 +17,24 @@ const slugify = (text: string): string => {
     .replace(/[\s_-]+/g, "-")
     .replace(/^-+|-+$/g, "");
 };
+
+/**
+ * Converts currentStock from internal baseUnit storage to human-readable sellUnit.
+ * e.g. 21600 g → 48 packets (where multiplier = 450 g/packet).
+ * Falls back to raw value when units are identical or conversion is unavailable.
+ */
+export function stockInSellUnits(p: ProductDocument): number {
+  const { baseUnit, sellUnit, multiplier } = p.unit ?? {};
+  if (!baseUnit || !sellUnit || baseUnit === sellUnit) return p.currentStock;
+  if (!canConvert(baseUnit, sellUnit, p.unit)) return p.currentStock;
+  try {
+    const inSell = convertQuantity(p.currentStock, baseUnit, sellUnit, p.unit);
+    // Floor to whole sellable units — you can't sell 0.3 of a packet
+    return Math.floor(inSell);
+  } catch {
+    return p.currentStock;
+  }
+}
 
 const mapToResponse = (p: ProductDocument): ProductResponse => ({
   id: p._id!.toString(),
@@ -32,7 +51,7 @@ const mapToResponse = (p: ProductDocument): ProductResponse => ({
   images: p.images || [],
   isActive: p.isActive,
   minStockAlert: p.minStockAlert,
-  currentStock: p.currentStock,
+  currentStock: stockInSellUnits(p),
   isOrganic: p.isOrganic,
   isFeatured: p.isFeatured,
   isSeasonal: p.isSeasonal,
@@ -123,12 +142,19 @@ export const getProducts = async (
   ]);
 
   const mapped = products.map(mapToResponse);
+  const totalPages = Math.ceil(totalCount / limitNum) || 1;
 
   return sendSuccess(
     res,
     mapped,
     "Products retrieved successfully.",
-    200
+    200,
+    {
+      total: totalCount,
+      page: pageNum,
+      limit: limitNum,
+      totalPages,
+    }
   );
 };
 

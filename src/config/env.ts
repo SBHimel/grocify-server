@@ -16,6 +16,7 @@ export interface ServerConfig {
   clientUrl: string;
   mongodbUri: string;
   dbName: string;
+  geminiApiKey: string;
 }
 
 const getEnvOrThrow = (key: string): string => {
@@ -32,4 +33,6 @@ export const config: ServerConfig = {
   clientUrl: process.env.CLIENT_URL || "http://localhost:3000",
   mongodbUri: getEnvOrThrow("MONGODB_URI"),
   dbName: (process.env.DB_NAME || process.env.AUTH_DB_NAME || "Grocify").trim(),
+  geminiApiKey: (process.env.GEMINI_API_KEY || "").trim(),
 };
+

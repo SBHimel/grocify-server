@@ -7,6 +7,8 @@ import { categoryRoutes } from "./modules/categories/categories.routes.js";
 import { productRoutes } from "./modules/products/products.routes.js";
 import { inventoryRoutes } from "./modules/inventory/inventory.routes.js";
 import { reviewRoutes } from "./modules/reviews/reviews.routes.js";
+import { orderRoutes } from "./modules/orders/orders.routes.js";
+import { aiRoutes } from "./modules/ai/ai.routes.js";
 import { errorHandler, notFoundHandler } from "./middlewares/error.js";
 import { sendSuccess } from "./utils/response.js";
 
@@ -47,6 +49,7 @@ export const createApp = (): Application => {
       products: "/api/v1/products",
       categories: "/api/v1/categories",
       inventory: "/api/v1/batches",
+      aiChat: "/api/v1/chat",
     }, "Server is running fine!");
   });
 
@@ -57,6 +60,8 @@ export const createApp = (): Application => {
   app.use("/api/v1", productRoutes);
   app.use("/api/v1", inventoryRoutes);
   app.use("/api/v1", reviewRoutes);
+  app.use("/api/v1", orderRoutes);
+  app.use("/api/v1", aiRoutes);
 
   // Legacy root-level compatibility mounts
   app.use("/", healthRoutes); // Compatibility for /health
